@@ -1,0 +1,67 @@
+# FiscalMatch · pila completa de desarrollo
+#   db  · PostgreSQL 16 con volumen persistente
+#   api · FastAPI (arranca solo cuando la base responde)
+#   web · portal compilado y servido por nginx en :5173
+name: fiscalmatch
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fiscalmatch-db
+    environment:
+      POSTGRES_USER: fiscalmatch
+      POSTGRES_PASSWORD: fiscalmatch
+      POSTGRES_DB: fiscalmatch
+    volumes:
+      - datos-db:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      # `depends_on: service_healthy` se apoya en esto: sin la prueba real,
+      # la API arranca antes de que Postgres acepte conexiones.
+      test: ["CMD-SHELL", "pg_isready -U fiscalmatch -d fiscalmatch"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - interna
+
+  api:
+    build:
+      context: ./backend
+    container_name: fiscalmatch-api
+    environment:
+      FM_DATABASE_URL: postgresql+psycopg://fiscalmatch:fiscalmatch@db:5432/fiscalmatch
+      FM_JWT_SECRET: cambia-esta-llave-en-produccion
+      FM_RFC_RECEPTOR_ESPERADO: FMA240101AB1
+      FM_TOLERANCIA_CENTAVOS: "100"
+      FM_TOLERANCIA_PORCENTAJE: "0.005"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - interna
+
+  web:
+    build:
+      context: ./frontend
+    container_name: fiscalmatch-web
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
+    networks:
+      - interna
+
+volumes:
+  datos-db:
+
+networks:
+  interna:
+    driver: bridge

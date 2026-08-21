@@ -1,0 +1,27 @@
+
+!.env.example
+# Entorno y datos locales
+# Node / frontend
+# Python / backend
+# Sistema operativo / editores
+*.db
+*.egg-info/
+*.py[cod]
+*.sqlite3
+.DS_Store
+.env
+.env.*
+.idea/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.vite/
+.vscode/
+Thumbs.db
+__pycache__/
+dist/
+node_modules/
+npm-debug.log*
+venv/
+yarn-error.log*
