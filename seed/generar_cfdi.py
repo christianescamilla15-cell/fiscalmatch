@@ -100,7 +100,7 @@ def _relleno_base64(semilla: str, longitud: int) -> str:
     bloques = bytearray()
     contador = 0
     while len(bloques) < crudos_necesarios:
-        bloques += hashlib.sha256(f"{semilla}#{contador}".encode("utf-8")).digest()
+        bloques += hashlib.sha256(f"{semilla}#{contador}".encode()).digest()
         contador += 1
     return base64.b64encode(bytes(bloques[:crudos_necesarios])).decode("ascii")
 

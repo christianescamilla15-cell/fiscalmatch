@@ -1,5 +1,6 @@
 """Configuración central. Todo el dinero se maneja en CENTAVOS (enteros)."""
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings
 
 

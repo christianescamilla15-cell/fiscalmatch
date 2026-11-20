@@ -607,7 +607,10 @@ def _imprimir_resumen(db, base: str, automatico: dict[ResultadoMatch, int]) -> N
             (
                 resultado.value,
                 len([c for c in conciliaciones if c.resultado is resultado]),
-                f"dif. máx {_pesos(max((abs(c.diferencia_centavos) for c in conciliaciones if c.resultado is resultado), default=0))}",
+                "dif. máx " + _pesos(max(
+                    (abs(c.diferencia_centavos) for c in conciliaciones if c.resultado is resultado),
+                    default=0,
+                )),
             )
             for resultado in ResultadoMatch
             if any(c.resultado is resultado for c in conciliaciones)

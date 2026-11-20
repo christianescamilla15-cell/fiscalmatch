@@ -18,7 +18,7 @@ import hashlib
 import hmac
 import json
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Final
 
 from app.core.config import get_settings
@@ -131,7 +131,7 @@ def crear_token(
     algoritmo = config.jwt_algorithm
     _funcion_hash(algoritmo)  # falla temprano si la configuración es inválida
 
-    ahora = datetime.now(timezone.utc)
+    ahora = datetime.now(UTC)
     vigencia = minutos if minutos is not None else config.jwt_expire_minutes
 
     encabezado = {"alg": algoritmo, "typ": "JWT"}
@@ -187,7 +187,7 @@ def decodificar_token(token: str) -> dict[str, Any]:
     expira = cuerpo.get("exp")
     if not isinstance(expira, (int, float)) or isinstance(expira, bool):
         raise ValueError("Token sin expiración válida")
-    if datetime.now(timezone.utc).timestamp() >= expira:
+    if datetime.now(UTC).timestamp() >= expira:
         raise ValueError("Token expirado")
 
     return cuerpo

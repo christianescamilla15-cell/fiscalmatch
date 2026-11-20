@@ -1,4 +1,5 @@
-# FiscalMatch · dependencias del backend (Python 3.12)
+# FiscalMatch · dependencias de ejecución del backend (Python 3.12).
+# Las de pruebas viven en requirements-dev.txt: la imagen de producción no las instala.
 
 fastapi>=0.115
 uvicorn[standard]>=0.32
@@ -7,7 +8,3 @@ psycopg[binary]>=3.2
 pydantic>=2.9
 pydantic-settings>=2.5
 python-multipart>=0.0.12
-
-# Pruebas
-pytest>=8.3
-httpx>=0.27
