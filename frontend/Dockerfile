@@ -1,6 +1,6 @@
 # FiscalMatch · portal (React 19 + Vite) servido por nginx
 # ---------------------------------------------------------------- build
-FROM node:20-alpine AS construccion
+FROM node:26-alpine AS construccion
 
 WORKDIR /app
 
