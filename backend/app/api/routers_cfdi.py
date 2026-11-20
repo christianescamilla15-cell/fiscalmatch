@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import SesionBD, es_de_otra_agencia, registrar_auditoria, requiere_rol
-from app.api.schemas import CfdiDetalleOut, CfdiOut
+from app.api.schemas import CfdiDetalleOut, CfdiOut, respuestas_error
 from app.core.config import get_settings
 from app.domain.models import (
     Agencia,
@@ -79,6 +79,7 @@ def _obtener_cfdi(db: Session, cfdi_id: int, usuario: Usuario) -> Cfdi:
     response_model=CfdiDetalleOut,
     status_code=status.HTTP_201_CREATED,
     summary="Cargar un CFDI de comisión",
+    responses=respuestas_error(400, 401, 403, 409, 422),
 )
 @router.post(
     "/",
@@ -253,7 +254,8 @@ def cargar_cfdi(
 # --------------------------------------------------------------------------- #
 
 
-@router.get("", response_model=list[CfdiOut], summary="Listar CFDIs")
+@router.get("", response_model=list[CfdiOut], summary="Listar CFDIs",
+            responses=respuestas_error(401, 403))
 @router.get("/", response_model=list[CfdiOut], include_in_schema=False)
 def listar_cfdis(
     db: SesionBD,
@@ -294,7 +296,8 @@ def listar_cfdis(
     return list(db.scalars(consulta).all())
 
 
-@router.get("/{cfdi_id}", response_model=CfdiDetalleOut, summary="Detalle de un CFDI")
+@router.get("/{cfdi_id}", response_model=CfdiDetalleOut, summary="Detalle de un CFDI",
+            responses=respuestas_error(401, 403, 404))
 def detalle_cfdi(
     cfdi_id: int,
     db: SesionBD,
@@ -304,7 +307,18 @@ def detalle_cfdi(
     return _obtener_cfdi(db, cfdi_id, usuario)
 
 
-@router.get("/{cfdi_id}/xml", summary="XML original del CFDI")
+@router.get(
+    "/{cfdi_id}/xml",
+    summary="XML original del CFDI",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "El XML tal como se recibió, como archivo adjunto",
+            "content": {"application/xml": {"schema": {"type": "string"}}},
+        },
+        **respuestas_error(401, 403, 404),
+    },
+)
 def xml_cfdi(
     cfdi_id: int,
     db: SesionBD,

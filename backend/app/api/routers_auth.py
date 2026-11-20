@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
 
 from app.api.deps import SesionBD, UsuarioActual, registrar_auditoria
-from app.api.schemas import LoginIn, TokenOut, UsuarioOut
+from app.api.schemas import LoginIn, TokenOut, UsuarioOut, respuestas_error
 from app.core.config import get_settings
 from app.core.seguridad import crear_token, verificar_password
 from app.domain.models import Usuario
@@ -13,7 +13,8 @@ from app.domain.models import Usuario
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=TokenOut, summary="Iniciar sesión")
+@router.post("/login", response_model=TokenOut, summary="Iniciar sesión",
+             responses=respuestas_error(401))
 def login(datos: LoginIn, db: SesionBD) -> TokenOut:
     """Entrega un token si las credenciales son válidas.
 
@@ -55,7 +56,8 @@ def login(datos: LoginIn, db: SesionBD) -> TokenOut:
     )
 
 
-@router.get("/yo", response_model=UsuarioOut, summary="Identidad en curso")
+@router.get("/yo", response_model=UsuarioOut, summary="Identidad en curso",
+            responses=respuestas_error(401))
 def yo(usuario: UsuarioActual) -> UsuarioOut:
     """Devuelve el usuario dueño del token, con su agencia si la tiene."""
     return UsuarioOut.model_validate(usuario)

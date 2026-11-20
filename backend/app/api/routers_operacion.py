@@ -24,6 +24,7 @@ from app.api.schemas import (
     ResolverIn,
     ResumenOut,
     formatear_centavos,
+    respuestas_error,
 )
 from app.domain.models import (
     Cfdi,
@@ -41,7 +42,12 @@ solo_operacion = requiere_rol(Rol.ANALISTA, Rol.ADMIN)
 
 #: El candado se declara UNA vez, a nivel de router: ninguna ruta puede
 #: quedarse sin él por olvido al agregarla.
-router = APIRouter(prefix="/api", tags=["operación"], dependencies=[Depends(solo_operacion)])
+router = APIRouter(
+    prefix="/api",
+    tags=["operación"],
+    dependencies=[Depends(solo_operacion)],
+    responses=respuestas_error(401, 403),
+)
 
 ENCABEZADOS_CSV = ["uuid", "rfc_emisor", "periodo", "total", "resultado", "diferencia", "estado"]
 
@@ -74,6 +80,7 @@ def listar_excepciones(
     "/conciliaciones/{conciliacion_id}/resolver",
     response_model=ConciliacionOut,
     summary="Resolver manualmente una excepción",
+    responses=respuestas_error(404, 409),
 )
 def resolver_excepcion(
     conciliacion_id: int,
@@ -224,7 +231,18 @@ def _generar_csv(filas: Sequence[tuple[Cfdi, Conciliacion | None]]) -> Iterator[
         yield _vaciar()
 
 
-@router.get("/exportar.csv", summary="Exportar CFDIs a CSV")
+@router.get(
+    "/exportar.csv",
+    summary="Exportar CFDIs a CSV",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "CSV UTF-8 con BOM (uuid, rfc_emisor, periodo, total, resultado, diferencia, "
+                           "estado)",
+            "content": {"text/csv": {"schema": {"type": "string"}}},
+        }
+    },
+)
 def exportar_csv(
     db: SesionBD,
     usuario: UsuarioActual,
