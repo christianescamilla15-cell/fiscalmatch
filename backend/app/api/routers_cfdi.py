@@ -131,7 +131,7 @@ def cargar_cfdi(
         if agencia is None:
             # Sin agencia no hay dónde archivarlo: se rechaza sin persistir.
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail={
                     "mensaje": "El CFDI no pasó la validación fiscal",
                     "reglas_fallidas": [
@@ -236,7 +236,7 @@ def cargar_cfdi(
     # 6) Rechazo: el comprobante queda archivado con su evidencia.
     if not paso:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={
                 "mensaje": "El CFDI no pasó la validación fiscal",
                 "cfdi_id": cfdi.id,
