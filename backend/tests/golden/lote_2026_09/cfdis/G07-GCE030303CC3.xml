@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd" Version="4.0" Serie="G" Folio="07" Fecha="2026-09-30T23:00:00" Sello="8yfmN4/NSMyKp6jJLQ5mh/AlH/9IfOgy/c6O6GGCTsDrZVNoFVsLV6WB/P1o/YRHgj2tyYh1NfIUHaSUoBmuWyBO0NU+Xed7vSjjyJgPIgjJi/eNOAWmEJYNBFGztt9GXDfj7bE+H+vsGDf3cQ6HjBBmZ/EFmh72ixq01U3rp2f/bnBgLUf8hZhuumDpro+ZLSclqtj4tbCULrKvLqrRPRHmnBG6BAyGlaBGuQui0bWeO2ojwj7Nz2rZyjc6nMsxGy18vI8pl5JkLKGA7jjkLyxg0zYfVlZD0u1uMHTbdmJer7Zs0W0eqi9Q7NxmpnAW6DLRxliwk/Yl4MlSfXHp2tjN" NoCertificado="30001000000500009901" Certificado="FiMXmFhwBsdBMwPxQjNR8UGoIaCobnbT+RzUtaqpoUfX7/7bzH3Y3PpG+BFnaCfwzubGdBsolPqkKkcq/1QOR/8vDl80V+iYhKybNjrH/1FWBjxcSfTDBLxpWNTCiWCHSVmfWO5IIbqxgfs0omVDPAHzesrHjdZ1HYkuIqETK+tG9GK3qE97rnZ/dn86jGFCMCj+DddzLanQ5yarjw25lINiJe8ovGLgtIlkeF2i4Yu5DBLhDcaDWDHBKZp6QvszsZ9IvQJehGvtNNBOjH+IOeQrk2F2xrYBEsvl1I46gL78RWrnIWIqkeHs0HrlnWC8okhit82C5nuA+gfhSvNDpJu9atgMAjvwxvU6ZYicJS29r42+m0SM/hL6geokVbhPHz8L/zM+plz4G3JkfkV6OHwAdAV7p2Ijy4vdJUh2DKz9BUYwlkS1fI4LK92a35CJiA/xSsuS1Zt+iI3QO1v8qMIpfYJFnRi+ZY6rk7FGxeWpQ8cmbbEFvHZyKgMA4A16IugSeZrBfJSQidtqTJZtVUqh6dMH2MZs6yTJKm1ZgoQbOqjPFqn2E93pIQQrnqrmtcIZdrA8VOAEILyJHBeoKm3RvcSfn70mjdhs4Fwk7g9NsygGNZGLzRrzTaE6sldnykqiAVae66wUnEhq6E3y6/H9HbLAY/0vaGkpspPJZ5O8uuj+tjx/PBYQWsR+du5bSAIfYldZorFnbHQLY8Si3ECsbYuWYNuF5aG6Di4XhdUpJPIoiecgjeNhFwi7ru88wLj94umwcsWx42iaj5lxuytSyJmOtOkttLW3uT99CqFqVDKGxRlzFzVAjK68lAc9ad3p273W/Az6CliElnt/Rq0mkLshs9Rm4xrwBw2v3sjS+j+Cm+5iXgpeBBnypQzvg1hZXp6LCLOAoi0V3KSOLlkWuUYpxHoXNd/q4LkZjaZDCdloUpZ1XnLFC7I2WW261bKtdSZCe6JJcfyrf4P+Y7WvPScKr/WbIYiPyQX7u/u5lUtVD6Wwue+puXiZv3qzYrb7quHX3+Cbe5iSKisgv2gJucTNw1iHVLzd544av4sVGlLDQ5lX4Hy4NvfoCl97HuuABujxYGXTfj+T57EB0NYPGa4vYic366sqaKPjf0Li9oyLFuFx4qmU3lAOud3u7pbTx53hUmPVZdAWagu28ZPWYXn7MODi7M8uLWi5S6pJYWz95aLPQKIsc3yk2GAIxdzBJU1aHumcnQDZFsSeJfVHFRElqHQhLTPTf97nkyvLS2F8IVL3okIBZjmW7Tjxsu4QltKgcLDRSvsqxhb0yIV4hXodmTJGT/E0JLXFJ5qKVqRoWVBwBYO4jVyBYmh8DJXFNlMFB5WchVxtNtC19IgVU7jM" FormaPago="03" MetodoPago="PUE" SubTotal="5024.14" Moneda="MXN" Total="5828.00" TipoDeComprobante="I" Exportacion="01" LugarExpedicion="06600">
+  <cfdi:Emisor Rfc="GCE030303CC3" Nombre="AGENCIA GOLDEN GAMA SA DE CV" RegimenFiscal="601"/>
+  <cfdi:Receptor Rfc="FMA240101AB1" Nombre="FISCALMATCH SA DE CV" DomicilioFiscalReceptor="06600" RegimenFiscalReceptor="601" UsoCFDI="G03"/>
+  <cfdi:Conceptos>
+    <cfdi:Concepto ClaveProdServ="80141600" Cantidad="1" ClaveUnidad="E48" Unidad="Servicio" Descripcion="Comisión del lote golden · dentro de la tolerancia porcentual" ValorUnitario="5024.14" Importe="5024.14" ObjetoImp="02">
+      <cfdi:Impuestos>
+        <cfdi:Traslados>
+          <cfdi:Traslado Base="5024.14" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="803.86"/>
+        </cfdi:Traslados>
+      </cfdi:Impuestos>
+    </cfdi:Concepto>
+  </cfdi:Conceptos>
+  <cfdi:Impuestos TotalImpuestosTrasladados="803.86">
+    <cfdi:Traslados>
+      <cfdi:Traslado Base="5024.14" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="803.86"/>
+    </cfdi:Traslados>
+  </cfdi:Impuestos>
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital xsi:schemaLocation="http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd" Version="1.1" UUID="F05F580B-A0DE-55C8-B571-CE537998C433" FechaTimbrado="2026-09-30T23:03:00" RfcProvCertif="PAC010101AB9" SelloCFD="8yfmN4/NSMyKp6jJLQ5mh/AlH/9IfOgy/c6O6GGCTsDrZVNoFVsLV6WB/P1o/YRHgj2tyYh1NfIUHaSUoBmuWyBO0NU+Xed7vSjjyJgPIgjJi/eNOAWmEJYNBFGztt9GXDfj7bE+H+vsGDf3cQ6HjBBmZ/EFmh72ixq01U3rp2f/bnBgLUf8hZhuumDpro+ZLSclqtj4tbCULrKvLqrRPRHmnBG6BAyGlaBGuQui0bWeO2ojwj7Nz2rZyjc6nMsxGy18vI8pl5JkLKGA7jjkLyxg0zYfVlZD0u1uMHTbdmJer7Zs0W0eqi9Q7NxmpnAW6DLRxliwk/Yl4MlSfXHp2tjN" NoCertificadoSAT="30001000000400002818" SelloSAT="qEi/wIV4VFWg2qnTVKfR+uSABmIKMAOhzT4UaOmGjIKb+iDHJG8QxZA1X6dIqWMZSewn3CW28+aafxKKCRknGVPwG4bUiizlZwZt0Vphj526Hrlsg3wMFWqOXfv+oXqsrvr1vKu7t7yqm+AZgWNOCl0qRZtx8/zetiFmNyIZO/JqoJWhhH5HVEH29KuughifSLvsgRFnU+QqjEusG88UkFqp1q06E25IlSA1E95NwSf3blrRKVHfBCmQa0aHDIgouXmlOKxftDy80I6XvzWUSxKmmqIq6X9VutLo2Bx68pOu/2Av1hufE185NAVZTqd2ENqlHQQAMhYNKEKEqeAK2/kR"/>
+  </cfdi:Complemento>
+</cfdi:Comprobante>

@@ -1,0 +1,18 @@
+{
+  "conteo": 16,
+  "suma_total": "30452976.02",
+  "suma_diferencia": "1149.06",
+  "por_estado": {
+    "CONCILIADO": 6,
+    "EN_EXCEPCION": 6,
+    "RECHAZADO": 4
+  },
+  "por_resultado": {
+    "(sin conciliar)": 4,
+    "MATCH": 6,
+    "NO_MATCH": 2,
+    "PARCIAL": 4
+  },
+  "hash_lote": "4f9b7a0ded8bb63206f0611fd8b7f8daf131b9b81e1a0f2e425ff2efb7b56373",
+  "definicion_hash": "sha256('|'.join(uuid, rfc_emisor, periodo, total, resultado, diferencia, estado)); importes con 2 decimales y vacío si no hay; hash_lote = sha256 de las huellas ordenadas unidas por salto de línea"
+}
