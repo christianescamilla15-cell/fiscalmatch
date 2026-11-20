@@ -15,8 +15,9 @@ import pytest
 
 from app.domain.models import ReporteVenta, ResultadoMatch
 from app.services.conciliacion import CandidatoReporte, conciliar, umbral_centavos
+from app.services.validacion import parsear_cfdi, validar
 
-from apoyo import RFC_ALFA, cargar, total_de, xml_cfdi
+from apoyo import RFC_ALFA, RFC_RECEPTOR, cargar, total_de, xml_cfdi
 
 PERIODO = "2026-09-P1"
 
@@ -59,6 +60,26 @@ def test_tolerancia_porcentual_es_inclusiva(diferencia: int, resultado: str) -> 
 def test_porcentaje_como_decimal_o_float_da_el_mismo_umbral() -> None:
     for comision in (0, 1, 14_900, 579_900, 21_000, 20_000_000, 3_000_000_001):
         assert umbral_centavos(comision, 100, 0.005) == umbral_centavos(comision, 100, Decimal("0.005"))
+
+
+@pytest.mark.parametrize(
+    ("subtotal", "impuestos", "total", "coherente"),
+    [
+        ("1000.005", "160.00", "1160.005", True),     # 100001 + 16000 = 116001 (HALF_UP en cada uno)
+        ("1000.004", "160.004", "1160.008", False),   # 100000 + 16000 ≠ 116001: no se suma antes de redondear
+        ("1000.00", "160.00", "1160.00", True),
+    ],
+)
+def test_cada_importe_del_xml_se_redondea_por_separado(subtotal, impuestos, total, coherente) -> None:
+    xml = (xml_cfdi(subtotal_centavos=100_000, impuestos_centavos=16_000)
+           .replace('SubTotal="1000.00"', f'SubTotal="{subtotal}"')
+           .replace('TotalImpuestosTrasladados="160.00"', f'TotalImpuestosTrasladados="{impuestos}"')
+           .replace('Total="1160.00"', f'Total="{total}"'))
+    parseado = parsear_cfdi(xml)
+    resultados = validar(parseado, xml_texto=xml, rfc_receptor_esperado=RFC_RECEPTOR,
+                         rfcs_agencias_registradas={RFC_ALFA}, uuids_existentes=set())
+    reglas = {r.regla: r.aprobada for r in resultados}
+    assert reglas["TOTALES_COHERENTES"] is coherente
 
 
 def test_cfdi_mayor_a_int32_se_guarda_y_concilia(cliente, bd, escenario) -> None:

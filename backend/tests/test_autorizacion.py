@@ -157,6 +157,19 @@ def test_token_con_firma_alterada_responde_401(cliente, escenario) -> None:
     assert respuesta.status_code == 401
 
 
+def test_token_con_algoritmo_none_responde_401(cliente, escenario) -> None:
+    """El algoritmo lo fija el servidor: un token «alg: none» sin firma no pasa (ataque clásico)."""
+    import base64
+    import json
+
+    def b64(datos: dict) -> str:
+        return base64.urlsafe_b64encode(json.dumps(datos).encode()).rstrip(b"=").decode()
+
+    _, cuerpo, _ = escenario.token("admin").split(".")
+    sin_firma = f"{b64({'alg': 'none', 'typ': 'JWT'})}.{cuerpo}."
+    assert cliente.get("/api/resumen", headers={"Authorization": f"Bearer {sin_firma}"}).status_code == 401
+
+
 def test_token_expirado_responde_401(cliente, escenario) -> None:
     usuario = escenario.usuarios["analista"]
     vencido = crear_token(usuario.id, usuario.rol, None, minutos=-1)
