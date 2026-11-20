@@ -49,7 +49,7 @@ jobs:
         run: grep -Eq '[1-9][0-9]* commits scanned' gitleaks.log
 
   codeql:
-    name: SAST (CodeQL)
+    name: SAST (CodeQL · ${{ matrix.lenguaje }})
     runs-on: ubuntu-latest
     permissions:
       security-events: write
