@@ -13,7 +13,12 @@ COPY src ./src
 RUN npm run build
 
 # ---------------------------------------------------------------- runtime
-FROM nginx:alpine AS servidor
+# nginx oficial SIN privilegios (usuario 101): el proceso nunca corre como root.
+FROM nginxinc/nginx-unprivileged:1.28-alpine AS servidor
+
+# La configuracion se escribe como root durante la construccion y se devuelve
+# el control al usuario sin privilegios antes de arrancar.
+USER root
 
 # El portal es una SPA: cualquier ruta profunda debe caer en index.html,
 # y /api se reenvia al servicio de la API dentro de la red de compose.
@@ -48,6 +53,8 @@ RUN printf '%s\n' \
     > /etc/nginx/conf.d/default.conf
 
 COPY --from=construccion /app/dist /usr/share/nginx/html
+
+USER 101
 
 EXPOSE 5173
 
