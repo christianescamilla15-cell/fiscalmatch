@@ -11,6 +11,18 @@ Dos capas bien separadas:
 REGLA TRANSVERSAL: todo importe viaja en CENTAVOS enteros. Nunca float.
 El único float permitido es la tolerancia porcentual, y su producto se
 trunca a entero antes de compararse.
+
+Máquina de estados del CFDI (ver docs/reglas.md, sección «Estados»):
+
+    carga ──▶ VALIDADO ──conciliar──▶ CONCILIADO (MATCH)
+         └──▶ RECHAZADO               EN_EXCEPCION (PARCIAL / NO_MATCH)
+    EN_EXCEPCION ──resolver(aceptar)──▶ CONCILIADO
+    EN_EXCEPCION ──resolver(no aceptar)──▶ EN_EXCEPCION
+    VALIDADO / CONCILIADO / EN_EXCEPCION ──conciliar──▶ (re-conciliación del motor)
+
+RECHAZADO es terminal (la evidencia se archiva, no se concilia) y sólo una
+excepción abierta se resuelve a mano: cualquier otra combinación lanza
+`TransicionInvalida`.
 """
 from __future__ import annotations
 
@@ -31,6 +43,32 @@ from app.domain.models import (
 
 # El campo `motivo` de la tabla admite 300 caracteres.
 LARGO_MAX_MOTIVO = 300
+
+#: Estados desde los que cada operación puede partir. Lo que no está aquí es
+#: una transición inválida.
+ORIGENES_PERMITIDOS: dict[str, frozenset[EstadoCfdi]] = {
+    # El motor concilia lo validado y puede re-conciliar lo ya dictaminado
+    # (p. ej. cuando llega tarde el reporte de venta del periodo).
+    "conciliar": frozenset({EstadoCfdi.VALIDADO, EstadoCfdi.CONCILIADO, EstadoCfdi.EN_EXCEPCION}),
+    # El analista sólo resuelve excepciones abiertas: un CFDI conciliado no se
+    # «des-concilia» a mano ni se resuelve lo que nunca pasó la validación.
+    "resolver": frozenset({EstadoCfdi.EN_EXCEPCION}),
+}
+
+
+class TransicionInvalida(ValueError):
+    """El CFDI no está en un estado desde el que se permita la operación pedida."""
+
+
+def exigir_estado(cfdi: Cfdi, operacion: str) -> None:
+    """Lanza `TransicionInvalida` si `operacion` no puede partir del estado actual del CFDI."""
+    permitidos = ORIGENES_PERMITIDOS[operacion]
+    if cfdi.estado not in permitidos:
+        esperados = ", ".join(sorted(estado.value for estado in permitidos))
+        raise TransicionInvalida(
+            f"No se puede {operacion} el CFDI {cfdi.uuid or cfdi.id}: está en "
+            f"{cfdi.estado.value} y la operación sólo parte de {esperados}."
+        )
 
 
 @dataclass(frozen=True)
@@ -161,7 +199,12 @@ def conciliar_cfdi(
     Crea la conciliación o REEMPLAZA la existente: al re-conciliar de forma
     automática se limpia la resolución manual previa, porque el veredicto
     vuelve a ser del motor.
+
+    Lanza `TransicionInvalida` si el CFDI no pasó la validación fiscal
+    (RECHAZADO) o aún no se dictamina (RECIBIDO): sin esto, un comprobante
+    rechazado podía terminar CONCILIADO.
     """
+    exigir_estado(cfdi, "conciliar")
     reportes = (
         db.execute(
             select(ReporteVenta).where(
@@ -238,7 +281,12 @@ def resolver_manual(
 
     En ambos casos queda registrado quién resolvió y con qué nota: es lo que
     después se cruza contra la bitácora de auditoría.
+
+    Lanza `TransicionInvalida` si el CFDI no está EN_EXCEPCION: resolver «no
+    aceptar» sobre un CFDI ya conciliado lo regresaba a la cola con resultado
+    MATCH, un estado incoherente.
     """
+    exigir_estado(conciliacion.cfdi, "resolver")
     conciliacion.metodo = MetodoMatch.MANUAL
     conciliacion.resuelta_por_id = usuario_id
     conciliacion.nota_resolucion = nota

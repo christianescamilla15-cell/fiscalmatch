@@ -12,3 +12,5 @@ ignore = [
 
 [lint.isort]
 known-first-party = ["app"]
+# Módulos de apoyo de backend/tests (pytest los pone en sys.path).
+known-local-folder = ["apoyo", "conftest", "paridad"]

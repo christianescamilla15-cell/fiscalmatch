@@ -34,7 +34,7 @@ from app.domain.models import (
     ResultadoMatch,
     Rol,
 )
-from app.services.conciliacion import resolver_manual
+from app.services.conciliacion import TransicionInvalida, resolver_manual
 
 #: La operación es territorio del analista; el administrador entra por herencia.
 solo_operacion = requiere_rol(Rol.ANALISTA, Rol.ADMIN)
@@ -85,6 +85,7 @@ def resolver_excepcion(
 
     Aceptar da el CFDI por conciliado; no aceptar respeta el veredicto del motor
     y lo deja en la cola. En ambos casos queda quién resolvió y con qué nota.
+    Si el CFDI no está EN_EXCEPCION responde 409 y no cambia nada.
     """
     conciliacion = db.get(Conciliacion, conciliacion_id)
     if conciliacion is None:
@@ -93,13 +94,19 @@ def resolver_excepcion(
             detail=f"No existe la conciliación {conciliacion_id}",
         )
 
-    resolver_manual(
-        db,
-        conciliacion,
-        usuario_id=usuario.id,
-        nota=datos.nota,
-        aceptar=datos.aceptar,
-    )
+    try:
+        resolver_manual(
+            db,
+            conciliacion,
+            usuario_id=usuario.id,
+            nota=datos.nota,
+            aceptar=datos.aceptar,
+        )
+    except TransicionInvalida as exc:
+        # Sólo se resuelve una excepción abierta; nada cambió, así que no hay
+        # nada que auditar ni que confirmar.
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     registrar_auditoria(
         db,
         usuario,
