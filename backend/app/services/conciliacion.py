@@ -9,8 +9,10 @@ Dos capas bien separadas:
   la transacción la cierra quien llama.
 
 REGLA TRANSVERSAL: todo importe viaja en CENTAVOS enteros. Nunca float.
-El único float permitido es la tolerancia porcentual, y su producto se
-trunca a entero antes de compararse.
+La tolerancia porcentual llega de la configuración como número, pero se
+convierte a `Decimal` por su representación decimal ("0.005") antes de
+multiplicar, y el producto se TRUNCA a centavos (ROUND_DOWN): el umbral
+nunca es más generoso que el porcentaje exacto.
 
 Máquina de estados del CFDI (ver docs/reglas.md, sección «Estados»):
 
@@ -27,6 +29,7 @@ excepción abierta se resuelve a mano: cualquier otra combinación lanza
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import ROUND_DOWN, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -103,12 +106,17 @@ def pesos(centavos: int) -> str:
     return f"{signo}${unidades:,}.{fraccion:02d} MXN"
 
 
-def _umbral(comision_centavos: int, tolerancia_centavos: int, tolerancia_porcentaje: float) -> int:
+def umbral_centavos(
+    comision_centavos: int, tolerancia_centavos: int, tolerancia_porcentaje: float | Decimal
+) -> int:
     """Umbral aplicable: el mayor entre la tolerancia absoluta y la porcentual.
 
-    La porcentual se TRUNCA a centavos enteros para no arrastrar decimales de punto flotante.
+    La porcentual se calcula en `Decimal` y se TRUNCA a centavos enteros. Con
+    float, `21000 * 0.009` da 188.99999999999997 y el truncado deja un umbral
+    de 188 cuando el exacto es 189: un centavo que cambia MATCH por PARCIAL.
     """
-    porcentual = int(abs(comision_centavos) * tolerancia_porcentaje)
+    porcentaje = Decimal(str(tolerancia_porcentaje))
+    porcentual = int((Decimal(abs(comision_centavos)) * porcentaje).to_integral_value(ROUND_DOWN))
     return max(tolerancia_centavos, porcentual)
 
 
@@ -119,7 +127,7 @@ def conciliar(
     candidatos: list[CandidatoReporte],
     *,
     tolerancia_centavos: int,
-    tolerancia_porcentaje: float,
+    tolerancia_porcentaje: float | Decimal,
 ) -> VeredictoConciliacion:
     """Compara el total del CFDI contra la comisión devengada del periodo.
 
@@ -151,7 +159,7 @@ def conciliar(
     # se deja constancia en el motivo para que el analista lo revise.
     elegido = min(elegibles, key=lambda c: abs(cfdi_total_centavos - c.comision_centavos))
     diferencia = cfdi_total_centavos - elegido.comision_centavos
-    umbral = _umbral(elegido.comision_centavos, tolerancia_centavos, tolerancia_porcentaje)
+    umbral = umbral_centavos(elegido.comision_centavos, tolerancia_centavos, tolerancia_porcentaje)
 
     prefijo = ""
     if len(elegibles) > 1:
@@ -192,7 +200,7 @@ def conciliar_cfdi(
     cfdi: Cfdi,
     *,
     tolerancia_centavos: int,
-    tolerancia_porcentaje: float,
+    tolerancia_porcentaje: float | Decimal,
 ) -> Conciliacion:
     """Concilia un CFDI ya validado y deja el veredicto persistido (sin commit).
 
