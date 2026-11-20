@@ -14,7 +14,7 @@ RUN npm run build
 
 # ---------------------------------------------------------------- runtime
 # nginx oficial SIN privilegios (usuario 101): el proceso nunca corre como root.
-FROM nginxinc/nginx-unprivileged:1.28-alpine AS servidor
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS servidor
 
 # La configuracion se escribe como root durante la construccion y se devuelve
 # el control al usuario sin privilegios antes de arrancar.
