@@ -7,7 +7,7 @@
 # Las de pruebas viven en requirements-dev.txt: la imagen de producción no las instala.
 
 # Directas
-fastapi==0.162.0
+fastapi==0.162.6
 uvicorn[standard]==0.54.0
 sqlalchemy==2.1.8
 psycopg[binary]==3.3.8
