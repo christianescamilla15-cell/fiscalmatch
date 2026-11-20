@@ -143,10 +143,14 @@ def cargar_cfdi(
             )
 
     # El UUID es único por diseño fiscal: un duplicado no se archiva, se rechaza.
-    if db.scalar(select(Cfdi.id).where(Cfdi.uuid == parseado.uuid)) is not None:
+    # Se normaliza a MAYÚSCULAS (como lo emite el SAT) antes de buscar y de guardar:
+    # el mismo folio reenviado en minúsculas es el mismo CFDI, no uno nuevo. Como lo
+    # guardado ya está normalizado, la búsqueda usa el índice único tal cual.
+    uuid = parseado.uuid.strip().upper()
+    if db.scalar(select(Cfdi.id).where(Cfdi.uuid == uuid)) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"El CFDI con UUID {parseado.uuid} ya fue cargado",
+            detail=f"El CFDI con UUID {uuid} ya fue cargado",
         )
 
     # 3) Validación fiscal --------------------------------------------------
@@ -163,7 +167,7 @@ def cargar_cfdi(
 
     # 4) Persistencia -------------------------------------------------------
     cfdi = Cfdi(
-        uuid=parseado.uuid,
+        uuid=uuid,
         rfc_emisor=rfc_emisor,
         rfc_receptor=parseado.rfc_receptor.strip().upper(),
         serie=parseado.serie,
@@ -190,7 +194,7 @@ def cargar_cfdi(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"El CFDI con UUID {parseado.uuid} ya fue cargado",
+            detail=f"El CFDI con UUID {uuid} ya fue cargado",
         ) from exc
 
     for resultado in resultados:
@@ -213,7 +217,7 @@ def cargar_cfdi(
         "Cfdi",
         cfdi.id,
         detalle=(
-            f"{nombre_archivo} · UUID {parseado.uuid} · "
+            f"{nombre_archivo} · UUID {uuid} · "
             f"{'validado' if paso else 'rechazado'} · {len(fallidas)} regla(s) fallida(s)"
         ),
     )
