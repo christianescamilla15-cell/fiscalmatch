@@ -29,6 +29,7 @@ excepción abierta se resuelve a mano: cualquier otra combinación lanza
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import ROUND_DOWN, Decimal
 
 from sqlalchemy import select
@@ -72,6 +73,16 @@ def exigir_estado(cfdi: Cfdi, operacion: str) -> None:
             f"No se puede {operacion} el CFDI {cfdi.uuid or cfdi.id}: está en "
             f"{cfdi.estado.value} y la operación sólo parte de {esperados}."
         )
+
+
+def periodo_de(fecha: date) -> str:
+    """Periodo quincenal al que pertenece una fecha de emisión ("2026-08-P1").
+
+    Días 1–15 → P1; del 16 al último día del mes → P2. La fecha ya viene en hora
+    de México (ver `validacion._a_fecha`), así que el corte de quincena es el
+    del calendario fiscal local, no el de UTC.
+    """
+    return f"{fecha.year:04d}-{fecha.month:02d}-P{1 if fecha.day <= 15 else 2}"
 
 
 @dataclass(frozen=True)

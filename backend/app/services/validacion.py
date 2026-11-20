@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from xml.etree import ElementTree as ET
+from zoneinfo import ZoneInfo
 
 # --------------------------------------------------------------------------- #
 # Constantes del estándar
@@ -35,6 +36,10 @@ NS_TFD = "http://www.sat.gob.mx/TimbreFiscalDigital"
 NS: dict[str, str] = {"cfdi": NS_CFDI, "tfd": NS_TFD}
 
 VERSION_ESPERADA = "4.0"
+
+#: Zona del calendario fiscal. Desde el 30-oct-2022 no tiene horario de verano
+#: (UTC-6 todo el año); la base de zonas (tzdata) lo sabe, así que no se fija a mano.
+ZONA_MEXICO = ZoneInfo("America/Mexico_City")
 MONEDA_ESPERADA = "MXN"
 DIGITOS_NO_CERTIFICADO = 20
 
@@ -174,15 +179,26 @@ def a_centavos(valor: str, *, campo: str) -> int:
 
 
 def _a_fecha(valor: str) -> date:
-    """La Fecha del CFDI es ISO 8601 ("2026-08-15T12:30:00"); nos quedamos con el día."""
+    """Día de emisión del CFDI en el calendario de México.
+
+    El Anexo 20 pide la Fecha en hora local del lugar de expedición y SIN zona
+    ("2026-08-15T23:30:00"): ese día se toma tal cual. Si el documento sí declara
+    zona ("...Z" o "-05:00"), el instante se lleva a America/Mexico_City antes de
+    quedarse con el día: "2026-08-16T05:30:00Z" es el 15 a las 23:30 en México y
+    pertenece a la primera quincena, no a la segunda.
+    """
     texto = (valor or "").strip()
     if not texto:
         raise ErrorParseoCfdi("El atributo 'Fecha' viene vacío y es obligatorio.")
     normalizada = texto[:-1] + "+00:00" if texto.endswith("Z") else texto
     try:
-        return datetime.fromisoformat(normalizada).date()
+        momento = datetime.fromisoformat(normalizada)
     except ValueError:
         pass
+    else:
+        if momento.tzinfo is not None:
+            momento = momento.astimezone(ZONA_MEXICO)
+        return momento.date()
     try:
         return date.fromisoformat(texto[:10])
     except ValueError as exc:

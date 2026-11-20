@@ -7,8 +7,6 @@ parte del expediente de auditoría.
 """
 from __future__ import annotations
 
-from datetime import date
-
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -27,7 +25,7 @@ from app.domain.models import (
     Usuario,
     Validacion,
 )
-from app.services.conciliacion import conciliar_cfdi
+from app.services.conciliacion import conciliar_cfdi, periodo_de
 from app.services.validacion import ErrorParseoCfdi, aprobado, parsear_cfdi, validar
 
 router = APIRouter(prefix="/api/cfdis", tags=["cfdis"])
@@ -54,16 +52,6 @@ def _decodificar(contenido: bytes) -> str:
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="No se pudo leer el archivo: codificación de caracteres desconocida",
     )
-
-
-def _periodo_de(fecha: date) -> str:
-    """Periodo quincenal al que pertenece la fecha de emisión ("2026-08-P1").
-
-    La comisión se liquida por quincena, así que el periodo se deriva de la
-    fecha del comprobante y no se le pide a quien carga: un dato capturado a
-    mano es un dato que puede no cuadrar.
-    """
-    return f"{fecha.year:04d}-{fecha.month:02d}-P{1 if fecha.day <= 15 else 2}"
 
 
 def _obtener_cfdi(db: Session, cfdi_id: int, usuario: Usuario) -> Cfdi:
@@ -181,7 +169,9 @@ def cargar_cfdi(
         serie=parseado.serie,
         folio=parseado.folio,
         fecha_emision=parseado.fecha_emision,
-        periodo=_periodo_de(parseado.fecha_emision),
+        # El periodo se deriva de la fecha del comprobante y no se le pide a quien
+        # carga: un dato capturado a mano es un dato que puede no cuadrar.
+        periodo=periodo_de(parseado.fecha_emision),
         subtotal_centavos=parseado.subtotal_centavos,
         impuestos_centavos=parseado.impuestos_centavos,
         total_centavos=parseado.total_centavos,
