@@ -7,6 +7,7 @@ entera —nunca con float— para que la vista no pueda introducir un redondeo.
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -24,6 +25,31 @@ def formatear_centavos(centavos: int | None) -> str | None:
     signo = "-" if centavos < 0 else ""
     absoluto = abs(centavos)
     return f"{signo}{absoluto // 100:,}.{absoluto % 100:02d}"
+
+
+class ErrorOut(BaseModel):
+    """Cuerpo de cualquier error de la API: FastAPI lo pone en `detail`.
+
+    Casi siempre es un texto; el rechazo fiscal de una carga trae un objeto con
+    `mensaje`, `estado` y `reglas_fallidas`.
+    """
+
+    detail: str | dict[str, Any] | list[Any]
+
+
+_DESCRIPCION_ERRORES: dict[int, str] = {
+    400: "Archivo que no es .xml, vacío, ilegible o que no se interpreta como CFDI",
+    401: "Sin token Bearer válido, token vencido o usuario inactivo",
+    403: "El rol del usuario o su agencia no permiten la operación",
+    404: "No existe el recurso pedido",
+    409: "Conflicto con el estado actual: UUID ya cargado o transición inválida",
+    422: "Petición inválida, o CFDI rechazado por la validación fiscal (queda archivado como RECHAZADO)",
+}
+
+
+def respuestas_error(*codigos: int) -> dict[int | str, dict[str, Any]]:
+    """Documenta en OpenAPI los errores que una ruta puede devolver, con su esquema."""
+    return {codigo: {"model": ErrorOut, "description": _DESCRIPCION_ERRORES[codigo]} for codigo in codigos}
 
 
 class _Desde(BaseModel):

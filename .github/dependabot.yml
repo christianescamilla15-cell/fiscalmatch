@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # no proponer versiones con menos de una semana publicadas
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # no proponer versiones con menos de una semana publicadas
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker      # imágenes base de backend/Dockerfile y frontend/Dockerfile
+    directories: [/backend, /frontend]
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # no proponer versiones con menos de una semana publicadas
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # no proponer versiones con menos de una semana publicadas

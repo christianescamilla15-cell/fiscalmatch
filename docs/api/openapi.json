@@ -1,0 +1,1979 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FiscalMatch API",
+    "description": "Conciliación de CFDIs de comisiones contra los reportes de venta del periodo. Todos los importes se manejan y se devuelven en centavos enteros.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Iniciar sesión",
+        "description": "Entrega un token si las credenciales son válidas.\n\nEl mensaje de error es el mismo para usuario inexistente, contraseña\nincorrecta o cuenta dada de baja: distinguirlos permitiría enumerar\ncuentas válidas.",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/yo": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Identidad en curso",
+        "description": "Devuelve el usuario dueño del token, con su agencia si la tiene.",
+        "operationId": "yo_api_auth_yo_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cfdis": {
+      "post": {
+        "tags": [
+          "cfdis"
+        ],
+        "summary": "Cargar un CFDI de comisión",
+        "description": "Recibe el XML, lo valida fiscalmente y —si pasa— lo concilia.",
+        "operationId": "cargar_cfdi_api_cfdis_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_cargar_cfdi_api_cfdis_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CfdiDetalleOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Archivo que no es .xml, vacío, ilegible o que no se interpreta como CFDI",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto con el estado actual: UUID ya cargado o transición inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Petición inválida, o CFDI rechazado por la validación fiscal (queda archivado como RECHAZADO)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "cfdis"
+        ],
+        "summary": "Listar CFDIs",
+        "description": "Lista comprobantes. El rol AGENCIA sólo ve los de su propia agencia.\n\nEl total sin paginar viaja en el encabezado `X-Total-Count`.",
+        "operationId": "listar_cfdis_api_cfdis_get",
+        "parameters": [
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EstadoCfdi"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por estado",
+              "title": "Estado"
+            },
+            "description": "Filtra por estado"
+          },
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ej. \"2026-08-P1\"",
+              "title": "Periodo"
+            },
+            "description": "Ej. \"2026-08-P1\""
+          },
+          {
+            "name": "resultado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ResultadoMatch"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Veredicto de conciliación",
+              "title": "Resultado"
+            },
+            "description": "Veredicto de conciliación"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CfdiOut"
+                  },
+                  "title": "Response Listar Cfdis Api Cfdis Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cfdis/{cfdi_id}": {
+      "get": {
+        "tags": [
+          "cfdis"
+        ],
+        "summary": "Detalle de un CFDI",
+        "description": "Comprobante con su desglose regla por regla y su conciliación.",
+        "operationId": "detalle_cfdi_api_cfdis__cfdi_id__get",
+        "parameters": [
+          {
+            "name": "cfdi_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cfdi Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CfdiDetalleOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el recurso pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cfdis/{cfdi_id}/xml": {
+      "get": {
+        "tags": [
+          "cfdis"
+        ],
+        "summary": "XML original del CFDI",
+        "description": "Devuelve el XML tal como se recibió, byte por byte, sin reescribirlo.",
+        "operationId": "xml_cfdi_api_cfdis__cfdi_id__xml_get",
+        "parameters": [
+          {
+            "name": "cfdi_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cfdi Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El XML tal como se recibió, como archivo adjunto",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el recurso pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/excepciones": {
+      "get": {
+        "tags": [
+          "operación"
+        ],
+        "summary": "Cola de excepciones",
+        "description": "CFDIs que el motor no pudo cerrar solo, con su conciliación adjunta.",
+        "operationId": "listar_excepciones_api_excepciones_get",
+        "parameters": [
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ej. \"2026-08-P1\"",
+              "title": "Periodo"
+            },
+            "description": "Ej. \"2026-08-P1\""
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CfdiOut"
+                  },
+                  "title": "Response Listar Excepciones Api Excepciones Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conciliaciones/{conciliacion_id}/resolver": {
+      "post": {
+        "tags": [
+          "operación"
+        ],
+        "summary": "Resolver manualmente una excepción",
+        "description": "Cierra una excepción con criterio humano y lo deja asentado en bitácora.\n\nAceptar da el CFDI por conciliado; no aceptar respeta el veredicto del motor\ny lo deja en la cola. En ambos casos queda quién resolvió y con qué nota.\nSi el CFDI no está EN_EXCEPCION responde 409 y no cambia nada.",
+        "operationId": "resolver_excepcion_api_conciliaciones__conciliacion_id__resolver_post",
+        "parameters": [
+          {
+            "name": "conciliacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conciliacion Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolverIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConciliacionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el recurso pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto con el estado actual: UUID ya cargado o transición inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resumen": {
+      "get": {
+        "tags": [
+          "operación"
+        ],
+        "summary": "Resumen agregado",
+        "description": "Conteos por estado y por veredicto, más los totales del periodo.\n\nLos conteos siempre traen TODAS las llaves posibles, aunque valgan cero: un\ntablero al que le faltan renglones se lee como si el dato no existiera.",
+        "operationId": "resumen_api_resumen_get",
+        "parameters": [
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ej. \"2026-08-P1\"",
+              "title": "Periodo"
+            },
+            "description": "Ej. \"2026-08-P1\""
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/exportar.csv": {
+      "get": {
+        "tags": [
+          "operación"
+        ],
+        "summary": "Exportar CFDIs a CSV",
+        "description": "Descarga el corte de CFDIs con su veredicto de conciliación.",
+        "operationId": "exportar_csv_api_exportar_csv_get",
+        "parameters": [
+          {
+            "name": "periodo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ej. \"2026-08-P1\"",
+              "title": "Periodo"
+            },
+            "description": "Ej. \"2026-08-P1\""
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EstadoCfdi"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por estado",
+              "title": "Estado"
+            },
+            "description": "Filtra por estado"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV UTF-8 con BOM (uuid, rfc_emisor, periodo, total, resultado, diferencia, estado)",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auditoria": {
+      "get": {
+        "tags": [
+          "operación"
+        ],
+        "summary": "Bitácora reciente",
+        "description": "Últimos movimientos registrados, del más reciente al más antiguo.\n\nEl orden lo marca el id, no la marca de tiempo: la bitácora es una tabla de\nsólo-anexar, así que el id es estrictamente monótono, mientras que el reloj\ndel host puede corregirse hacia atrás y desordenar el expediente.",
+        "operationId": "auditoria_api_auditoria_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Máximo 100 eventos",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Máximo 100 eventos"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventoAuditoriaOut"
+                  },
+                  "title": "Response Auditoria Api Auditoria Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin token Bearer válido, token vencido o usuario inactivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El rol del usuario o su agencia no permiten la operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "infra"
+        ],
+        "summary": "Sonda de salud",
+        "description": "Responde sin tocar la base: sirve como sonda de vida del proceso.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "tags": [
+          "infra"
+        ],
+        "summary": "Versión desplegada",
+        "description": "Versión y parámetros de conciliación vigentes (sin secretos).",
+        "operationId": "version_api_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Version Api Version Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgenciaOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "rfc": {
+            "type": "string",
+            "title": "Rfc"
+          },
+          "razon_social": {
+            "type": "string",
+            "title": "Razon Social"
+          },
+          "activa": {
+            "type": "boolean",
+            "title": "Activa"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rfc",
+          "razon_social",
+          "activa"
+        ],
+        "title": "AgenciaOut"
+      },
+      "Body_cargar_cfdi_api_cfdis_post": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "XML del CFDI 4.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_cargar_cfdi_api_cfdis_post"
+      },
+      "CfdiDetalleOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "uuid": {
+            "type": "string",
+            "title": "Uuid"
+          },
+          "rfc_emisor": {
+            "type": "string",
+            "title": "Rfc Emisor"
+          },
+          "rfc_receptor": {
+            "type": "string",
+            "title": "Rfc Receptor"
+          },
+          "serie": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie"
+          },
+          "folio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folio"
+          },
+          "fecha_emision": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Emision"
+          },
+          "periodo": {
+            "type": "string",
+            "title": "Periodo"
+          },
+          "subtotal_centavos": {
+            "type": "integer",
+            "title": "Subtotal Centavos"
+          },
+          "impuestos_centavos": {
+            "type": "integer",
+            "title": "Impuestos Centavos",
+            "default": 0
+          },
+          "total_centavos": {
+            "type": "integer",
+            "title": "Total Centavos"
+          },
+          "moneda": {
+            "type": "string",
+            "title": "Moneda",
+            "default": "MXN"
+          },
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoCfdi"
+          },
+          "agencia_id": {
+            "type": "integer",
+            "title": "Agencia Id"
+          },
+          "cargado_por_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cargado Por Id"
+          },
+          "cargado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Cargado En"
+          },
+          "conciliacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConciliacionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validaciones": {
+            "items": {
+              "$ref": "#/components/schemas/ValidacionOut"
+            },
+            "type": "array",
+            "title": "Validaciones"
+          },
+          "total_formateado": {
+            "type": "string",
+            "title": "Total Formateado",
+            "readOnly": true
+          },
+          "resultado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultadoMatch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Veredicto del motor, o `None` si el CFDI aún no se concilió.",
+            "readOnly": true
+          },
+          "diferencia_centavos": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diferencia Centavos",
+            "readOnly": true
+          },
+          "diferencia_formateada": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diferencia Formateada",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "uuid",
+          "rfc_emisor",
+          "rfc_receptor",
+          "fecha_emision",
+          "periodo",
+          "subtotal_centavos",
+          "total_centavos",
+          "nombre_archivo",
+          "estado",
+          "agencia_id",
+          "cargado_en",
+          "total_formateado",
+          "resultado",
+          "diferencia_centavos",
+          "diferencia_formateada"
+        ],
+        "title": "CfdiDetalleOut",
+        "description": "Vista de detalle: agrega el desglose regla por regla."
+      },
+      "CfdiOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "uuid": {
+            "type": "string",
+            "title": "Uuid"
+          },
+          "rfc_emisor": {
+            "type": "string",
+            "title": "Rfc Emisor"
+          },
+          "rfc_receptor": {
+            "type": "string",
+            "title": "Rfc Receptor"
+          },
+          "serie": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie"
+          },
+          "folio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folio"
+          },
+          "fecha_emision": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Emision"
+          },
+          "periodo": {
+            "type": "string",
+            "title": "Periodo"
+          },
+          "subtotal_centavos": {
+            "type": "integer",
+            "title": "Subtotal Centavos"
+          },
+          "impuestos_centavos": {
+            "type": "integer",
+            "title": "Impuestos Centavos",
+            "default": 0
+          },
+          "total_centavos": {
+            "type": "integer",
+            "title": "Total Centavos"
+          },
+          "moneda": {
+            "type": "string",
+            "title": "Moneda",
+            "default": "MXN"
+          },
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoCfdi"
+          },
+          "agencia_id": {
+            "type": "integer",
+            "title": "Agencia Id"
+          },
+          "cargado_por_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cargado Por Id"
+          },
+          "cargado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Cargado En"
+          },
+          "conciliacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConciliacionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_formateado": {
+            "type": "string",
+            "title": "Total Formateado",
+            "readOnly": true
+          },
+          "resultado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultadoMatch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Veredicto del motor, o `None` si el CFDI aún no se concilió.",
+            "readOnly": true
+          },
+          "diferencia_centavos": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diferencia Centavos",
+            "readOnly": true
+          },
+          "diferencia_formateada": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diferencia Formateada",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "uuid",
+          "rfc_emisor",
+          "rfc_receptor",
+          "fecha_emision",
+          "periodo",
+          "subtotal_centavos",
+          "total_centavos",
+          "nombre_archivo",
+          "estado",
+          "agencia_id",
+          "cargado_en",
+          "total_formateado",
+          "resultado",
+          "diferencia_centavos",
+          "diferencia_formateada"
+        ],
+        "title": "CfdiOut",
+        "description": "Vista de lista: el CFDI con el veredicto de su conciliación."
+      },
+      "ConciliacionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "cfdi_id": {
+            "type": "integer",
+            "title": "Cfdi Id"
+          },
+          "reporte_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporte Id"
+          },
+          "resultado": {
+            "$ref": "#/components/schemas/ResultadoMatch"
+          },
+          "diferencia_centavos": {
+            "type": "integer",
+            "title": "Diferencia Centavos",
+            "default": 0
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo",
+            "default": ""
+          },
+          "metodo": {
+            "$ref": "#/components/schemas/MetodoMatch"
+          },
+          "resuelta_por_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resuelta Por Id"
+          },
+          "nota_resolucion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota Resolucion"
+          },
+          "conciliada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Conciliada En"
+          },
+          "diferencia_formateada": {
+            "type": "string",
+            "title": "Diferencia Formateada",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cfdi_id",
+          "resultado",
+          "metodo",
+          "conciliada_en",
+          "diferencia_formateada"
+        ],
+        "title": "ConciliacionOut"
+      },
+      "ErrorOut": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorOut",
+        "description": "Cuerpo de cualquier error de la API: FastAPI lo pone en `detail`.\n\nCasi siempre es un texto; el rechazo fiscal de una carga trae un objeto con\n`mensaje`, `estado` y `reglas_fallidas`."
+      },
+      "EstadoCfdi": {
+        "type": "string",
+        "enum": [
+          "RECIBIDO",
+          "VALIDADO",
+          "RECHAZADO",
+          "CONCILIADO",
+          "EN_EXCEPCION"
+        ],
+        "title": "EstadoCfdi"
+      },
+      "EventoAuditoriaOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "accion": {
+            "type": "string",
+            "title": "Accion"
+          },
+          "entidad": {
+            "type": "string",
+            "title": "Entidad"
+          },
+          "entidad_id": {
+            "type": "string",
+            "title": "Entidad Id"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle",
+            "default": ""
+          },
+          "ocurrido_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ocurrido En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "actor",
+          "accion",
+          "entidad",
+          "entidad_id",
+          "ocurrido_en"
+        ],
+        "title": "EventoAuditoriaOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LoginIn": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginIn"
+      },
+      "MetodoMatch": {
+        "type": "string",
+        "enum": [
+          "AUTOMATICO",
+          "MANUAL"
+        ],
+        "title": "MetodoMatch"
+      },
+      "ResolverIn": {
+        "properties": {
+          "aceptar": {
+            "type": "boolean",
+            "title": "Aceptar"
+          },
+          "nota": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Nota",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "aceptar"
+        ],
+        "title": "ResolverIn",
+        "description": "Resolución manual de una excepción por parte de un analista."
+      },
+      "ResultadoMatch": {
+        "type": "string",
+        "enum": [
+          "MATCH",
+          "PARCIAL",
+          "NO_MATCH"
+        ],
+        "title": "ResultadoMatch"
+      },
+      "ResumenOut": {
+        "properties": {
+          "periodo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo"
+          },
+          "total_cfdis": {
+            "type": "integer",
+            "title": "Total Cfdis",
+            "default": 0
+          },
+          "por_estado": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Por Estado"
+          },
+          "por_resultado": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Por Resultado"
+          },
+          "total_facturado_centavos": {
+            "type": "integer",
+            "title": "Total Facturado Centavos",
+            "default": 0
+          },
+          "total_conciliado_centavos": {
+            "type": "integer",
+            "title": "Total Conciliado Centavos",
+            "default": 0
+          },
+          "total_reportado_centavos": {
+            "type": "integer",
+            "title": "Total Reportado Centavos",
+            "default": 0
+          },
+          "diferencia_total_centavos": {
+            "type": "integer",
+            "title": "Diferencia Total Centavos",
+            "default": 0
+          },
+          "total_facturado_formateado": {
+            "type": "string",
+            "title": "Total Facturado Formateado",
+            "readOnly": true
+          },
+          "total_conciliado_formateado": {
+            "type": "string",
+            "title": "Total Conciliado Formateado",
+            "readOnly": true
+          },
+          "total_reportado_formateado": {
+            "type": "string",
+            "title": "Total Reportado Formateado",
+            "readOnly": true
+          },
+          "diferencia_total_formateada": {
+            "type": "string",
+            "title": "Diferencia Total Formateada",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_facturado_formateado",
+          "total_conciliado_formateado",
+          "total_reportado_formateado",
+          "diferencia_total_formateada"
+        ],
+        "title": "ResumenOut",
+        "description": "Tablero agregado: conteos por estado y por veredicto, más totales."
+      },
+      "Rol": {
+        "type": "string",
+        "enum": [
+          "AGENCIA",
+          "ANALISTA",
+          "ADMIN"
+        ],
+        "title": "Rol"
+      },
+      "TokenOut": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expira_en_minutos": {
+            "type": "integer",
+            "title": "Expira En Minutos"
+          },
+          "usuario": {
+            "$ref": "#/components/schemas/UsuarioOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expira_en_minutos",
+          "usuario"
+        ],
+        "title": "TokenOut"
+      },
+      "UsuarioOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "rol": {
+            "$ref": "#/components/schemas/Rol"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          },
+          "agencia_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agencia Id"
+          },
+          "agencia": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgenciaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "nombre",
+          "rol",
+          "activo"
+        ],
+        "title": "UsuarioOut"
+      },
+      "ValidacionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "regla": {
+            "type": "string",
+            "title": "Regla"
+          },
+          "aprobada": {
+            "type": "boolean",
+            "title": "Aprobada"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle",
+            "default": ""
+          },
+          "evaluada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Evaluada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "regla",
+          "aprobada",
+          "evaluada_en"
+        ],
+        "title": "ValidacionOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

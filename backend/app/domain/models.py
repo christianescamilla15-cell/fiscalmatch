@@ -2,20 +2,33 @@
 
 REGLA TRANSVERSAL: todo importe se guarda en CENTAVOS como entero (`*_centavos`).
 Nunca float: en materia fiscal un centavo de diferencia es un hallazgo.
+
+Los importes son BIGINT: un INTEGER de PostgreSQL topa en 2,147,483,647 centavos
+($21,474,836.47) y un CFDI mayor reventaba la carga con error 500 (en SQLite no se
+nota porque sus enteros son de 64 bits).
 """
 from __future__ import annotations
 
 import enum
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
-    Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint,
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Base(DeclarativeBase):
@@ -84,9 +97,9 @@ class Cfdi(Base):
     folio: Mapped[str | None] = mapped_column(String(40), nullable=True)
     fecha_emision: Mapped[date] = mapped_column(Date, index=True)
     periodo: Mapped[str] = mapped_column(String(10), index=True)  # "2026-08-P1"
-    subtotal_centavos: Mapped[int] = mapped_column(Integer)
-    impuestos_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    total_centavos: Mapped[int] = mapped_column(Integer)
+    subtotal_centavos: Mapped[int] = mapped_column(BigInteger)
+    impuestos_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    total_centavos: Mapped[int] = mapped_column(BigInteger)
     moneda: Mapped[str] = mapped_column(String(3), default="MXN")
     no_certificado: Mapped[str | None] = mapped_column(String(20), nullable=True)
     xml_original: Mapped[str] = mapped_column(Text)
@@ -98,7 +111,9 @@ class Cfdi(Base):
 
     agencia: Mapped[Agencia] = relationship(back_populates="cfdis")
     validaciones: Mapped[list[Validacion]] = relationship(back_populates="cfdi", cascade="all, delete-orphan")
-    conciliacion: Mapped[Conciliacion | None] = relationship(back_populates="cfdi", uselist=False, cascade="all, delete-orphan")
+    conciliacion: Mapped[Conciliacion | None] = relationship(
+        back_populates="cfdi", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class Validacion(Base):
@@ -121,7 +136,7 @@ class ReporteVenta(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     periodo: Mapped[str] = mapped_column(String(10), index=True)
     rfc_agencia: Mapped[str] = mapped_column(String(13), index=True)
-    comision_centavos: Mapped[int] = mapped_column(Integer)
+    comision_centavos: Mapped[int] = mapped_column(BigInteger)
     boletos: Mapped[int] = mapped_column(Integer, default=0)
     referencia: Mapped[str] = mapped_column(String(60), default="")
     cargado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -134,7 +149,7 @@ class Conciliacion(Base):
     cfdi_id: Mapped[int] = mapped_column(ForeignKey("cfdis.id"), unique=True, index=True)
     reporte_id: Mapped[int | None] = mapped_column(ForeignKey("reportes_venta.id"), nullable=True)
     resultado: Mapped[ResultadoMatch] = mapped_column(Enum(ResultadoMatch), index=True)
-    diferencia_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    diferencia_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     motivo: Mapped[str] = mapped_column(String(300), default="")
     metodo: Mapped[MetodoMatch] = mapped_column(Enum(MetodoMatch), default=MetodoMatch.AUTOMATICO)
     resuelta_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)

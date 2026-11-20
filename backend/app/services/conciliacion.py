@@ -9,12 +9,28 @@ Dos capas bien separadas:
   la transacción la cierra quien llama.
 
 REGLA TRANSVERSAL: todo importe viaja en CENTAVOS enteros. Nunca float.
-El único float permitido es la tolerancia porcentual, y su producto se
-trunca a entero antes de compararse.
+La tolerancia porcentual llega de la configuración como número, pero se
+convierte a `Decimal` por su representación decimal ("0.005") antes de
+multiplicar, y el producto se TRUNCA a centavos (ROUND_DOWN): el umbral
+nunca es más generoso que el porcentaje exacto.
+
+Máquina de estados del CFDI (ver docs/reglas.md, sección «Estados»):
+
+    carga ──▶ VALIDADO ──conciliar──▶ CONCILIADO (MATCH)
+         └──▶ RECHAZADO               EN_EXCEPCION (PARCIAL / NO_MATCH)
+    EN_EXCEPCION ──resolver(aceptar)──▶ CONCILIADO
+    EN_EXCEPCION ──resolver(no aceptar)──▶ EN_EXCEPCION
+    VALIDADO / CONCILIADO / EN_EXCEPCION ──conciliar──▶ (re-conciliación del motor)
+
+RECHAZADO es terminal (la evidencia se archiva, no se concilia) y sólo una
+excepción abierta se resuelve a mano: cualquier otra combinación lanza
+`TransicionInvalida`.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
+from decimal import ROUND_DOWN, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -31,6 +47,42 @@ from app.domain.models import (
 
 # El campo `motivo` de la tabla admite 300 caracteres.
 LARGO_MAX_MOTIVO = 300
+
+#: Estados desde los que cada operación puede partir. Lo que no está aquí es
+#: una transición inválida.
+ORIGENES_PERMITIDOS: dict[str, frozenset[EstadoCfdi]] = {
+    # El motor concilia lo validado y puede re-conciliar lo ya dictaminado
+    # (p. ej. cuando llega tarde el reporte de venta del periodo).
+    "conciliar": frozenset({EstadoCfdi.VALIDADO, EstadoCfdi.CONCILIADO, EstadoCfdi.EN_EXCEPCION}),
+    # El analista sólo resuelve excepciones abiertas: un CFDI conciliado no se
+    # «des-concilia» a mano ni se resuelve lo que nunca pasó la validación.
+    "resolver": frozenset({EstadoCfdi.EN_EXCEPCION}),
+}
+
+
+class TransicionInvalida(ValueError):
+    """El CFDI no está en un estado desde el que se permita la operación pedida."""
+
+
+def exigir_estado(cfdi: Cfdi, operacion: str) -> None:
+    """Lanza `TransicionInvalida` si `operacion` no puede partir del estado actual del CFDI."""
+    permitidos = ORIGENES_PERMITIDOS[operacion]
+    if cfdi.estado not in permitidos:
+        esperados = ", ".join(sorted(estado.value for estado in permitidos))
+        raise TransicionInvalida(
+            f"No se puede {operacion} el CFDI {cfdi.uuid or cfdi.id}: está en "
+            f"{cfdi.estado.value} y la operación sólo parte de {esperados}."
+        )
+
+
+def periodo_de(fecha: date) -> str:
+    """Periodo quincenal al que pertenece una fecha de emisión ("2026-08-P1").
+
+    Días 1–15 → P1; del 16 al último día del mes → P2. La fecha ya viene en hora
+    de México (ver `validacion._a_fecha`), así que el corte de quincena es el
+    del calendario fiscal local, no el de UTC.
+    """
+    return f"{fecha.year:04d}-{fecha.month:02d}-P{1 if fecha.day <= 15 else 2}"
 
 
 @dataclass(frozen=True)
@@ -65,12 +117,17 @@ def pesos(centavos: int) -> str:
     return f"{signo}${unidades:,}.{fraccion:02d} MXN"
 
 
-def _umbral(comision_centavos: int, tolerancia_centavos: int, tolerancia_porcentaje: float) -> int:
+def umbral_centavos(
+    comision_centavos: int, tolerancia_centavos: int, tolerancia_porcentaje: float | Decimal
+) -> int:
     """Umbral aplicable: el mayor entre la tolerancia absoluta y la porcentual.
 
-    La porcentual se TRUNCA a centavos enteros para no arrastrar decimales de punto flotante.
+    La porcentual se calcula en `Decimal` y se TRUNCA a centavos enteros. Con
+    float, `21000 * 0.009` da 188.99999999999997 y el truncado deja un umbral
+    de 188 cuando el exacto es 189: un centavo que cambia MATCH por PARCIAL.
     """
-    porcentual = int(abs(comision_centavos) * tolerancia_porcentaje)
+    porcentaje = Decimal(str(tolerancia_porcentaje))
+    porcentual = int((Decimal(abs(comision_centavos)) * porcentaje).to_integral_value(ROUND_DOWN))
     return max(tolerancia_centavos, porcentual)
 
 
@@ -81,7 +138,7 @@ def conciliar(
     candidatos: list[CandidatoReporte],
     *,
     tolerancia_centavos: int,
-    tolerancia_porcentaje: float,
+    tolerancia_porcentaje: float | Decimal,
 ) -> VeredictoConciliacion:
     """Compara el total del CFDI contra la comisión devengada del periodo.
 
@@ -113,7 +170,7 @@ def conciliar(
     # se deja constancia en el motivo para que el analista lo revise.
     elegido = min(elegibles, key=lambda c: abs(cfdi_total_centavos - c.comision_centavos))
     diferencia = cfdi_total_centavos - elegido.comision_centavos
-    umbral = _umbral(elegido.comision_centavos, tolerancia_centavos, tolerancia_porcentaje)
+    umbral = umbral_centavos(elegido.comision_centavos, tolerancia_centavos, tolerancia_porcentaje)
 
     prefijo = ""
     if len(elegibles) > 1:
@@ -154,14 +211,19 @@ def conciliar_cfdi(
     cfdi: Cfdi,
     *,
     tolerancia_centavos: int,
-    tolerancia_porcentaje: float,
+    tolerancia_porcentaje: float | Decimal,
 ) -> Conciliacion:
     """Concilia un CFDI ya validado y deja el veredicto persistido (sin commit).
 
     Crea la conciliación o REEMPLAZA la existente: al re-conciliar de forma
     automática se limpia la resolución manual previa, porque el veredicto
     vuelve a ser del motor.
+
+    Lanza `TransicionInvalida` si el CFDI no pasó la validación fiscal
+    (RECHAZADO) o aún no se dictamina (RECIBIDO): sin esto, un comprobante
+    rechazado podía terminar CONCILIADO.
     """
+    exigir_estado(cfdi, "conciliar")
     reportes = (
         db.execute(
             select(ReporteVenta).where(
@@ -238,7 +300,12 @@ def resolver_manual(
 
     En ambos casos queda registrado quién resolvió y con qué nota: es lo que
     después se cruza contra la bitácora de auditoría.
+
+    Lanza `TransicionInvalida` si el CFDI no está EN_EXCEPCION: resolver «no
+    aceptar» sobre un CFDI ya conciliado lo regresaba a la cola con resultado
+    MATCH, un estado incoherente.
     """
+    exigir_estado(conciliacion.cfdi, "resolver")
     conciliacion.metodo = MetodoMatch.MANUAL
     conciliacion.resuelta_por_id = usuario_id
     conciliacion.nota_resolucion = nota

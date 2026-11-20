@@ -1,0 +1,16 @@
+# ruff: la misma configuración en local y en el CI (no depende de la del equipo de quien lo corre).
+target-version = "py312"
+line-length = 110
+extend-exclude = ["frontend", ".venv-calidad"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+  "B008",   # Depends()/Query()/File() en los valores por omisión es el idioma de FastAPI
+  "UP042",  # (str, Enum) → StrEnum cambia str() de los miembros que SQLAlchemy guarda: no es cosmético
+]
+
+[lint.isort]
+known-first-party = ["app"]
+# Módulos de apoyo de backend/tests (pytest los pone en sys.path).
+known-local-folder = ["apoyo", "conftest", "paridad"]

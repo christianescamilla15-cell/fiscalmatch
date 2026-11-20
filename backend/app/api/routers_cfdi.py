@@ -7,15 +7,13 @@ parte del expediente de auditoría.
 """
 from __future__ import annotations
 
-from datetime import date
-
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import SesionBD, es_de_otra_agencia, registrar_auditoria, requiere_rol
-from app.api.schemas import CfdiDetalleOut, CfdiOut
+from app.api.schemas import CfdiDetalleOut, CfdiOut, respuestas_error
 from app.core.config import get_settings
 from app.domain.models import (
     Agencia,
@@ -27,7 +25,7 @@ from app.domain.models import (
     Usuario,
     Validacion,
 )
-from app.services.conciliacion import conciliar_cfdi
+from app.services.conciliacion import conciliar_cfdi, periodo_de
 from app.services.validacion import ErrorParseoCfdi, aprobado, parsear_cfdi, validar
 
 router = APIRouter(prefix="/api/cfdis", tags=["cfdis"])
@@ -56,16 +54,6 @@ def _decodificar(contenido: bytes) -> str:
     )
 
 
-def _periodo_de(fecha: date) -> str:
-    """Periodo quincenal al que pertenece la fecha de emisión ("2026-08-P1").
-
-    La comisión se liquida por quincena, así que el periodo se deriva de la
-    fecha del comprobante y no se le pide a quien carga: un dato capturado a
-    mano es un dato que puede no cuadrar.
-    """
-    return f"{fecha.year:04d}-{fecha.month:02d}-P{1 if fecha.day <= 15 else 2}"
-
-
 def _obtener_cfdi(db: Session, cfdi_id: int, usuario: Usuario) -> Cfdi:
     """Recupera un CFDI aplicando la frontera de visibilidad por agencia."""
     cfdi = db.get(Cfdi, cfdi_id)
@@ -91,6 +79,7 @@ def _obtener_cfdi(db: Session, cfdi_id: int, usuario: Usuario) -> Cfdi:
     response_model=CfdiDetalleOut,
     status_code=status.HTTP_201_CREATED,
     summary="Cargar un CFDI de comisión",
+    responses=respuestas_error(400, 401, 403, 409, 422),
 )
 @router.post(
     "/",
@@ -142,7 +131,7 @@ def cargar_cfdi(
         if agencia is None:
             # Sin agencia no hay dónde archivarlo: se rechaza sin persistir.
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail={
                     "mensaje": "El CFDI no pasó la validación fiscal",
                     "reglas_fallidas": [
@@ -155,10 +144,14 @@ def cargar_cfdi(
             )
 
     # El UUID es único por diseño fiscal: un duplicado no se archiva, se rechaza.
-    if db.scalar(select(Cfdi.id).where(Cfdi.uuid == parseado.uuid)) is not None:
+    # Se normaliza a MAYÚSCULAS (como lo emite el SAT) antes de buscar y de guardar:
+    # el mismo folio reenviado en minúsculas es el mismo CFDI, no uno nuevo. Como lo
+    # guardado ya está normalizado, la búsqueda usa el índice único tal cual.
+    uuid = parseado.uuid.strip().upper()
+    if db.scalar(select(Cfdi.id).where(Cfdi.uuid == uuid)) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"El CFDI con UUID {parseado.uuid} ya fue cargado",
+            detail=f"El CFDI con UUID {uuid} ya fue cargado",
         )
 
     # 3) Validación fiscal --------------------------------------------------
@@ -175,13 +168,15 @@ def cargar_cfdi(
 
     # 4) Persistencia -------------------------------------------------------
     cfdi = Cfdi(
-        uuid=parseado.uuid,
+        uuid=uuid,
         rfc_emisor=rfc_emisor,
         rfc_receptor=parseado.rfc_receptor.strip().upper(),
         serie=parseado.serie,
         folio=parseado.folio,
         fecha_emision=parseado.fecha_emision,
-        periodo=_periodo_de(parseado.fecha_emision),
+        # El periodo se deriva de la fecha del comprobante y no se le pide a quien
+        # carga: un dato capturado a mano es un dato que puede no cuadrar.
+        periodo=periodo_de(parseado.fecha_emision),
         subtotal_centavos=parseado.subtotal_centavos,
         impuestos_centavos=parseado.impuestos_centavos,
         total_centavos=parseado.total_centavos,
@@ -200,7 +195,7 @@ def cargar_cfdi(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"El CFDI con UUID {parseado.uuid} ya fue cargado",
+            detail=f"El CFDI con UUID {uuid} ya fue cargado",
         ) from exc
 
     for resultado in resultados:
@@ -223,7 +218,7 @@ def cargar_cfdi(
         "Cfdi",
         cfdi.id,
         detalle=(
-            f"{nombre_archivo} · UUID {parseado.uuid} · "
+            f"{nombre_archivo} · UUID {uuid} · "
             f"{'validado' if paso else 'rechazado'} · {len(fallidas)} regla(s) fallida(s)"
         ),
     )
@@ -241,7 +236,7 @@ def cargar_cfdi(
     # 6) Rechazo: el comprobante queda archivado con su evidencia.
     if not paso:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={
                 "mensaje": "El CFDI no pasó la validación fiscal",
                 "cfdi_id": cfdi.id,
@@ -259,7 +254,8 @@ def cargar_cfdi(
 # --------------------------------------------------------------------------- #
 
 
-@router.get("", response_model=list[CfdiOut], summary="Listar CFDIs")
+@router.get("", response_model=list[CfdiOut], summary="Listar CFDIs",
+            responses=respuestas_error(401, 403))
 @router.get("/", response_model=list[CfdiOut], include_in_schema=False)
 def listar_cfdis(
     db: SesionBD,
@@ -300,7 +296,8 @@ def listar_cfdis(
     return list(db.scalars(consulta).all())
 
 
-@router.get("/{cfdi_id}", response_model=CfdiDetalleOut, summary="Detalle de un CFDI")
+@router.get("/{cfdi_id}", response_model=CfdiDetalleOut, summary="Detalle de un CFDI",
+            responses=respuestas_error(401, 403, 404))
 def detalle_cfdi(
     cfdi_id: int,
     db: SesionBD,
@@ -310,7 +307,18 @@ def detalle_cfdi(
     return _obtener_cfdi(db, cfdi_id, usuario)
 
 
-@router.get("/{cfdi_id}/xml", summary="XML original del CFDI")
+@router.get(
+    "/{cfdi_id}/xml",
+    summary="XML original del CFDI",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "El XML tal como se recibió, como archivo adjunto",
+            "content": {"application/xml": {"schema": {"type": "string"}}},
+        },
+        **respuestas_error(401, 403, 404),
+    },
+)
 def xml_cfdi(
     cfdi_id: int,
     db: SesionBD,
