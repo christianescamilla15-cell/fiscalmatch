@@ -12,7 +12,7 @@ uvicorn[standard]==0.54.0
 sqlalchemy==2.1.8
 psycopg[binary]==3.3.8
 pydantic==2.14.3
-pydantic-settings==2.16.2
+pydantic-settings==2.16.3
 python-multipart==0.0.33
 tzdata==2026.6
 
