@@ -4,17 +4,32 @@ updates:
     directory: /backend
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }   # no proponer versiones con menos de una semana publicadas
+    groups:                       # menores y parches juntos: un PR por semana; las mayores van solas
+      pip-backend-menores:
+        update-types: [minor, patch]
     open-pull-requests-limit: 5
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }   # no proponer versiones con menos de una semana publicadas
+    groups:                       # menores y parches juntos: un PR por semana; las mayores van solas
+      npm-frontend-menores:
+        update-types: [minor, patch]
     open-pull-requests-limit: 5
   - package-ecosystem: docker      # imágenes base de backend/Dockerfile y frontend/Dockerfile
     directories: [/backend, /frontend]
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }   # no proponer versiones con menos de una semana publicadas
+    groups:                       # menores y parches juntos: un PR por semana; las mayores van solas
+      docker-backend-frontend-menores:
+        update-types: [minor, patch]
+    ignore:                       # la versión de Python de la imagen debe ser la que prueba el CI
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }   # no proponer versiones con menos de una semana publicadas
+    groups:                       # menores y parches juntos: un PR por semana; las mayores van solas
+      acciones-menores:
+        update-types: [minor, patch]
