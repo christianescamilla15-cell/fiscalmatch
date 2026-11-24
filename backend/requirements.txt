@@ -7,20 +7,20 @@
 # Las de pruebas viven en requirements-dev.txt: la imagen de producción no las instala.
 
 # Directas
-fastapi==0.162.6
+fastapi==0.163.2
 uvicorn[standard]==0.54.0
-sqlalchemy==2.1.8
+sqlalchemy==2.1.9
 psycopg[binary]==3.3.9
 pydantic==2.14.3
 pydantic-settings==2.16.3
-python-multipart==0.0.33
+python-multipart==0.0.34
 tzdata==2026.6
 
 # Transitivas
 annotated-doc==0.0.6
 annotated-types==0.8.0
 anyio==4.16.0
-click==8.5.0
+click==8.5.1
 h11==0.16.0
 httptools==0.9.0
 idna==3.20
